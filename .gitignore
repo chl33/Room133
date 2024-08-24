@@ -4,3 +4,4 @@
 /secrets*.ini
 /data/*.json
 *~
+/KiCAD/Room133-backups/
