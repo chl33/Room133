@@ -1,3 +1,7 @@
+// Copyright (c) 2024 Chris Lee and contibuters.
+// Licensed under the MIT license. See LICENSE file in the project root for
+// details.
+
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <WiFiClientSecure.h>
@@ -88,7 +92,8 @@ constexpr float kLeakKernelSec = 2 * kSecInMin;
 constexpr int kLeakDecimals = 1;
 #endif
 
-// Global variable for html, so asyncwebserver can send data in the background (single client)
+// Global variable for html, so asyncwebserver can send data in the background
+// (single client)
 String s_html;
 
 #if HAVE_OLED
@@ -154,7 +159,8 @@ class Monitor : public Module {
   Monitor(HAApp* app)
       : Module("monitor", &app->module_system()),
         m_app(app),
-        // Every minute, read sensors and send readings via MQTT, starting in 10 seconds.
+        // Every minute, read sensors and send readings via MQTT, starting in 10
+        // seconds.
         m_mqtt_scheduler(
             10 * kMsecInSec, kMsecInMin, [this]() { sendMqtt(); }, &app->tasks()),
         m_cvg("room_cfg"),
