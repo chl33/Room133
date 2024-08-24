@@ -5,3 +5,4 @@
 /data/*.json
 *~
 /KiCAD/Room133-backups/
+*.old
