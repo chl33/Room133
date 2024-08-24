@@ -3,3 +3,4 @@
 /.ccls-cache/
 /secrets*.ini
 /data/*.json
+*~
