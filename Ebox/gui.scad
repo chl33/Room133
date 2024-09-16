@@ -1,18 +1,18 @@
 // :GUI:
-leak_check = true;
+leak_check = false;
 // :GUI:
-oled = false;
+oled = true;
 // :GUI:
 mount_tab = false;
 // :GUI:
-motion_light = true;
+motion_light = false;
 // :GUI:
-motion = true;
+motion = false;
 // :GUI:
 radar = false;
 // :GUI:
 show_vitamins = true;
 // :GUI:
-show_box = true;
+show_box = false;
 // :GUI:
 top = true;
