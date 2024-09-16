@@ -1,6 +1,6 @@
 # Room133
 
-Room133 is an ESP32-based family of which helps with various room-monitoring tasks in a house, for use with [Home Assistant](https://www.home-assistant.io/).  It can
+Room133 is an ESP32-based family of devices which helps with various room-monitoring tasks, particulary for use with [Home Assistant](https://www.home-assistant.io/).  It can
 - Monitor temperature and humidity in different rooms.
 - Measure light level in different rooms and detects motion/presence in those rooms for
    lighting control,
