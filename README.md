@@ -1,10 +1,21 @@
 # Room133
 
-Room133 is an ESP32-based device which helps with various room-monitoring tasks in a house, for use with [Home Assistant](https://www.home-assistant.io/).
+Room133 is an ESP32-based family of which helps with various room-monitoring tasks in a house, for use with [Home Assistant](https://www.home-assistant.io/).  It can
+- Monitor temperature and humidity in different rooms.
+- Measure light level in different rooms and detects motion/presence in those rooms for
+   lighting control,
+- Check for standing water.
+- Monitor the water level of a boiler.
+- Act as a Bluetooth extenders for the Home Assistant[^HomeAssistant].
 
 It is based on the [og3](https://github.com/chl33/og3) C++ software framework for ESP devices.
 
+This repository includes software for the device, KiCAD files for the circuit board, and OpenSCAD files for creating the project boxes for the different devices.
+
+Please see the [write-up](https://selectiveappeal.org/posts/room133/) on the project in my blog.  I also [wrote about](https://selectiveappeal.org/posts/room133-box/) the EBox design included in this repository.
+
 ![Room133 board render](images/room133_board_render.png)
+
 
 ## PCBA design: KiCAD
 
