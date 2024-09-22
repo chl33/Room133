@@ -121,6 +121,11 @@ module Room133_box(top) {
 	  translate([board_dims[0]-13.7, 5.5, space_below_board+1.6]) cube([8.4, 8, 50]);
 	}
       }
+      if (radar) {
+	translate([-1, -1, total_above_board+space_below_board+board_thickness+2*gap+0.2])
+	  cube([outer_dims[0]+2, outer_dims[1]+2, 10]);
+	// translate([-1, -1, -1]) cube([100, 20, 40]);
+      }
     }
   }
 }
