@@ -105,8 +105,8 @@ OledDisplayRing s_oled(&s_app.module_system(), kSoftware, kOledSwitchMsec, Oled:
 #if HAVE_LEAK
 class LeakSensor {
  public:
-  LeakSensor(const char* name, ModuleSystem* module_system_, VariableGroup* cfgvg,
-             VariableGroup* vg)
+  LeakSensor(const char* name, ModuleSystem* module_system_, VariableGroup& cfgvg,
+             VariableGroup& vg)
       : m_leak_sensor(
             MappedAnalogSensor::Options{
                 .name = name,
@@ -187,7 +187,7 @@ class Monitor : public Module {
             &app->module_system(), m_cvg, m_vg),
 #endif  // HAVE_MOTION_LIGHT
 #if HAVE_LEAK
-        m_leak_sensor(kLeakSensor, &app->module_system(), &m_cvg, &m_vg),
+        m_leak_sensor(kLeakSensor, &app->module_system(), m_cvg, m_vg),
 #endif
 #if HAVE_MOTION_LIGHT
         m_pir1(kPirModule, kMotion, &app->module_system(), &app->tasks(), kPirPin1, kMotion, m_vg,
