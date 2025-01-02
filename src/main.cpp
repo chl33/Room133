@@ -60,19 +60,29 @@ HAApp s_app(HAApp::Options(kManufacturer, kModel,
 
 // Hardware config
 #if HAVE_MOTION_LIGHT
+#if OLD_PINS
 constexpr uint8_t kPirPin1 = 25;
 constexpr uint8_t kLightPin = 33;
+#else
+constexpr uint8_t kPirPin1 = 16;
+constexpr uint8_t kLightPin = 32;
+#endif
 #endif
 #if HAVE_MOTION
+#if OLD_PINS
 constexpr uint8_t kPirPin2 = 23;
+#else
+constexpr uint8_t kPirPin2 = 17;
+#endif
 #endif
 #if HAVE_LEAK
 constexpr uint8_t kLeakPin = 32;
 #endif
 
-constexpr uint8_t kRedLed = 18;
-constexpr uint8_t kYellowLed = 19;
-constexpr uint8_t kBlueLed = 20;
+// Whoops -- pins 34 and 35 are input-only.
+// constexpr uint8_t kRedLed = 34;
+// constexpr uint8_t kYellowLed = 35;
+constexpr uint8_t kBlueLed = 27;
 
 // Names
 static const char kTemperature[] = "temperature";
@@ -190,18 +200,15 @@ class Monitor : public Module {
         m_leak_sensor(kLeakSensor, &app->module_system(), m_cvg, m_vg),
 #endif
 #if HAVE_MOTION_LIGHT
-        m_pir1(kPirModule, kMotion, &app->module_system(), &app->tasks(), kPirPin1, kMotion, m_vg,
-               true, true),
+        m_pir1(kPirModule, kMotion, &app->module_system(), kPirPin1, kMotion, m_vg, true, true),
 #endif
 #if HAVE_MOTION
-        m_pir2(kPirModule2, kMotion2, &app->module_system(), &app->tasks(), kPirPin2, kMotion2,
-               m_vg, true, true),
+        m_pir2(kPirModule2, kMotion2, &app->module_system(), kPirPin2, kMotion2, m_vg, true, true),
 #endif
 #if HAVE_OLED
         m_wifi_oled(&app->tasks()),
 #endif
-        m_ylw_blink("ylw_blink", kYellowLed, app, 500),
-        m_blu_blink("blu_blink", kBlueLed, app, 500),
+        m_blu_blink("blu_blink", kBlueLed, app, 500, false),
         m_shtc3(kTemperature, kHumidity, &app->module_system(), "temperature", m_vg) {
     setDependencies(&m_dependencies);
     add_init_fn([this]() {
@@ -221,10 +228,10 @@ class Monitor : public Module {
 #endif
       }
 #if HAVE_MOTION_LIGHT
-      // m_pir1.callOnMotion([this]() { onMotion(); });
+      m_pir1.callOnMotion([this]() { onMotion(); });
 #endif
 #if HAVE_MOTION
-      // m_pir2.callOnMotion([this]() { onMotion(); });
+      m_pir2.callOnMotion([this]() { onMotion(); });
 #endif
 #if HAVE_OLED
       s_oled.addDisplayFn([this]() {
@@ -263,33 +270,6 @@ class Monitor : public Module {
 #endif
   }
 
-  void checkMotion() {
-#if HAVE_MOTION_LIGHT || HAVE_MOTION
-    bool changed = false;
-#if HAVE_MOTION_LIGHT
-    static bool wasMotion1 = false;
-    m_pir1.read();
-    const bool motion1 = m_pir1.motion();
-    changed = changed || (wasMotion1 != motion1);
-#endif  // HAVE_MOTION_LIGHT
-#if HAVE_MOTION
-    static bool wasMotion2 = false;
-    m_pir2.read();
-    const bool motion2 = m_pir2.motion();
-    changed = changed || (wasMotion2 != motion2);
-#endif  // HAVE_MOTION
-    if (changed) {
-      onMotion();
-    }
-#if HAVE_MOTION_LIGHT
-    wasMotion1 = motion1;
-#endif  // HAVE_MOTION_LIGHT
-#if HAVE_MOTION
-    wasMotion2 = motion2;
-#endif  // HAVE_MOTION
-#endif  // Motion1 or motion2
-  }
-
  private:
   Logger& log() { return m_app->log(); }
   void sendMqtt() {
@@ -317,7 +297,7 @@ class Monitor : public Module {
     sendMqtt();
 #if HAVE_MOTION_LIGHT
     if (m_pir1.motion()) {
-      m_ylw_blink.blink();
+      m_blu_blink.blink();
       log().debug("Motion1!");
 #if HAVE_OLED
       s_oled.display("Motion");
@@ -326,7 +306,7 @@ class Monitor : public Module {
 #endif
 #if HAVE_MOTION
     if (m_pir2.motion()) {
-      m_blu_blink.blink();
+      m_blu_blink.blink(2);
       log().debug("Motion2!");
 #if HAVE_OLED
       s_oled.display("Motion2");
@@ -358,7 +338,6 @@ class Monitor : public Module {
 #if HAVE_OLED
   OledWifiInfo m_wifi_oled;
 #endif
-  BlinkLed m_ylw_blink;
   BlinkLed m_blu_blink;
   Shtc3 m_shtc3;
 };
@@ -396,7 +375,4 @@ void setup() {
   og3::s_app.setup();
 }
 
-void loop() {
-  og3::s_app.loop();
-  og3::s_monitor.checkMotion();
-}
+void loop() { og3::s_app.loop(); }
