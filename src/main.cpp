@@ -60,7 +60,7 @@ HAApp s_app(HAApp::Options(kManufacturer, kModel,
 
 // Hardware config
 #if HAVE_MOTION_LIGHT
-#if OLD_PINS
+#if !OLD_PINS
 constexpr uint8_t kPirPin1 = 25;
 constexpr uint8_t kLightPin = 33;
 #else
@@ -69,7 +69,7 @@ constexpr uint8_t kLightPin = 32;
 #endif
 #endif
 #if HAVE_MOTION
-#if OLD_PINS
+#if !OLD_PINS
 constexpr uint8_t kPirPin2 = 23;
 #else
 constexpr uint8_t kPirPin2 = 17;
