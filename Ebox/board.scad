@@ -24,7 +24,7 @@ module room133_to_oled_frame() {
 module Room133_board() {
   // Board imported from KiCad (VRML) -> meshlab.
   translate([board_dims[0]/2, board_dims[1]/2, board_dims[2]/2]) color("white")
-    import(file="RoomL33a.stl", convexity=3);
+    import(file="Room133.stl", convexity=3);
 
   // Optionally add the OLED screen
   if (oled) {

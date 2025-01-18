@@ -72,7 +72,7 @@ module Room133_box(top) {
   wall = wall_thickness;
   screw_tab_d = mount_tab ? 10 : 0;
 
-  shtc3_loc = [board_dims[0] - 4.2, 7.3];
+  shtc3_loc = [board_dims[0] - 4.2, 8.4];
 
   difference() {
     union() {

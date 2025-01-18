@@ -34,3 +34,20 @@ You can open [`Ebox/Room133_test.scad`](Ebox/Room133_test.scad) with OpenSCAD an
 
 I slice my EBox models with PrusaSlicer and print them in PETG.
 
+## Wires
+
+### PIR wire
+
+JST socket 3x1
+
+| Pin 1 | Pin2 | Pin 3  |
+|:------|:-----|:-------|
+| +5V   | GND  | Motion |
+
+to
+
+Dupont socket 3x1
+
+| Pin 1 | Pin2 |  Pin 3  |
+|:------|:------|:-------|
+| +5V   | Motion| GND    |

@@ -79,9 +79,14 @@ constexpr uint8_t kPirPin2 = 17;
 constexpr uint8_t kLeakPin = 32;
 #endif
 
+#if BOARD_V10
+constexpr uint8_t kRedLed = 18;
+constexpr uint8_t kYellowLed = 19;
+#else
 // Whoops -- pins 34 and 35 are input-only.
 // constexpr uint8_t kRedLed = 34;
 // constexpr uint8_t kYellowLed = 35;
+#endif
 constexpr uint8_t kBlueLed = 27;
 
 // Names
@@ -209,6 +214,10 @@ class Monitor : public Module {
         m_wifi_oled(&app->tasks()),
 #endif
         m_blu_blink("blu_blink", kBlueLed, app, 500, false),
+#if BOARD_V10
+        m_red_blink("red_blink", kRedLed, app, 500, false),
+        m_ylw_blink("ylw_blink", kYellowLed, app, 500, false),
+#endif
         m_shtc3(kTemperature, kHumidity, &app->module_system(), "temperature", m_vg) {
     setDependencies(&m_dependencies);
     add_init_fn([this]() {
@@ -339,6 +348,10 @@ class Monitor : public Module {
   OledWifiInfo m_wifi_oled;
 #endif
   BlinkLed m_blu_blink;
+#if BOARD_V10
+  BlinkLed m_red_blink;
+  BlinkLed m_ylw_blink;
+#endif
   Shtc3 m_shtc3;
 };
 
