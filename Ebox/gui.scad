@@ -5,7 +5,7 @@ oled = true;
 // :GUI:
 mount_tab = false;
 // :GUI:
-motion_light = false;
+motion_light = true;
 // :GUI:
 motion = false;
 // :GUI:
@@ -13,6 +13,6 @@ radar = false;
 // :GUI:
 show_vitamins = true;
 // :GUI:
-show_box = false;
+show_box = true;
 // :GUI:
 top = true;
