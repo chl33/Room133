@@ -3,7 +3,7 @@ leak_check = false;
 // :GUI:
 oled = true;
 // :GUI:
-mount_tab = false;
+mount_tab = true;
 // :GUI:
 motion_light = true;
 // :GUI:
