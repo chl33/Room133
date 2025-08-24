@@ -32,7 +32,7 @@
 #include <og3/motion_detector.h>
 #endif
 
-#define VERSION "0.9.8"
+#define VERSION "0.9.9"
 
 namespace og3 {
 
@@ -100,7 +100,7 @@ constexpr int kLeakDecimals = 1;
 
 // Global variable for html, so asyncwebserver can send data in the background
 // (single client)
-String s_html;
+std::string s_html;
 
 #if HAVE_OLED
 // Delay between updates of the OLED.
@@ -132,7 +132,7 @@ class LeakSensor {
                 .valid_in_max = 4095,
             },
             module_system_, cfgvg, vg),
-        m_filtered_name(String(name) + "_filtered"),
+        m_filtered_name(std::string(name) + "_filtered"),
         m_filter(
             {
                 .name = m_filtered_name.c_str(),
@@ -155,7 +155,7 @@ class LeakSensor {
 
  private:
   MappedAnalogSensor m_leak_sensor;
-  String m_filtered_name;
+  std::string m_filtered_name;
   KernelFilter m_filter;
 };
 #endif
@@ -249,7 +249,7 @@ class Monitor : public Module {
     ::og3::read(*request, m_cvg);
     s_html.clear();
     html::writeFormTableInto(&s_html, m_cvg);
-    s_html += F(HTML_BUTTON("/", "Back"));
+    s_html += HTML_BUTTON("/", "Back");
     sendWrappedHTML(request, kSoftware, kSoftware, s_html.c_str());
     s_app.config().write_config(m_cvg);
   }
@@ -359,7 +359,7 @@ void handleWebRoot(AsyncWebServerRequest* request) {
   html::writeTableInto(&s_html, s_monitor.vg());
   html::writeTableInto(&s_html, s_app.wifi_manager().variables());
   html::writeTableInto(&s_html, s_app.mqtt_manager().variables());
-  s_html += F(HTML_BUTTON("/config", "Config"));
+  s_html += HTML_BUTTON("/config", "Config");
   s_button_wifi_config.add_button(&s_html);
   s_button_mqtt_config.add_button(&s_html);
   s_button_app_status.add_button(&s_html);
