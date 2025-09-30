@@ -100,7 +100,7 @@ constexpr int kLeakDecimals = 1;
 
 // Global variable for html, so asyncwebserver can send data in the background
 // (single client)
-std::string s_html;
+String s_html;
 
 #if HAVE_OLED
 // Delay between updates of the OLED.
