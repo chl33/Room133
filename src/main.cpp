@@ -132,7 +132,7 @@ class LeakSensor {
                 .valid_in_max = 4095,
             },
             module_system_, cfgvg, vg),
-        m_filtered_name(std::string(name) + "_filtered"),
+        m_filtered_name(String(name) + "_filtered"),
         m_filter(
             {
                 .name = m_filtered_name.c_str(),
@@ -155,7 +155,7 @@ class LeakSensor {
 
  private:
   MappedAnalogSensor m_leak_sensor;
-  std::string m_filtered_name;
+  String m_filtered_name;
   KernelFilter m_filter;
 };
 #endif
