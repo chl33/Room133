@@ -1,6 +1,7 @@
 .pio
 /.ccls
 /.ccls-cache/
+/local*.ini
 /secrets*.ini
 /data/*.json
 *~
