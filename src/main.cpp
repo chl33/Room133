@@ -32,7 +32,7 @@
 #include <og3/motion_detector.h>
 #endif
 
-#define VERSION "0.9.91"
+#define VERSION "0.9.92"
 
 namespace og3 {
 
