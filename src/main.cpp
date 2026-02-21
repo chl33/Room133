@@ -1,5 +1,5 @@
-// Copyright (c) 2024 Chris Lee and contibuters.
-// Licensed under the MIT license. See LICENSE file in the project root for
+// Copyright (c) 2026 Chris Lee and contibuters.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
 // details.
 
 #include <Arduino.h>
@@ -32,7 +32,7 @@
 #include <og3/motion_detector.h>
 #endif
 
-#define VERSION "0.9.91"
+#define VERSION "0.9.92"
 
 namespace og3 {
 
