@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Chris Lee and contibuters.
+// Copyright (c) 2026 Chris Lee and contributors.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 // details.
 
@@ -298,7 +298,7 @@ class Monitor : public Module {
 #if HAVE_MOTION_LIGHT
     if (m_pir1.motion()) {
       m_blu_blink.blink();
-      log().debug("Motion1!");
+      log().log("Motion1!");
 #if HAVE_OLED
       s_oled.display("Motion");
 #endif
@@ -307,7 +307,7 @@ class Monitor : public Module {
 #if HAVE_MOTION
     if (m_pir2.motion()) {
       m_blu_blink.blink(2);
-      log().debug("Motion2!");
+      log().log("Motion2!");
 #if HAVE_OLED
       s_oled.display("Motion2");
 #endif
