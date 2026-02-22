@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Chris Lee and contibuters.
+// Copyright (c) 2026 Chris Lee and contributors.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 // This is a base which can clip onto a radar box to help it stand.
