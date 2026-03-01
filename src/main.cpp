@@ -245,13 +245,14 @@ class Monitor : public Module {
   }
   const VariableGroup& vg() const { return m_vg; }
 
-  void handleConfigRequest(AsyncWebServerRequest* request) {
+  int handleConfigRequest(og3::NetRequest* request) {
     ::og3::read(*request, m_cvg);
     s_html.clear();
     html::writeFormTableInto(&s_html, m_cvg);
     s_html += HTML_BUTTON("/", "Back");
     sendWrappedHTML(request, kSoftware, kSoftware, s_html.c_str());
     s_app.config().write_config(m_cvg);
+    return ESP_OK;
   }
 
   void readSensors() {
@@ -353,7 +354,7 @@ WebButton s_button_mqtt_config = s_app.createMqttConfigButton();
 WebButton s_button_app_status = s_app.createAppStatusButton();
 WebButton s_button_restart = s_app.createRestartButton();
 
-void handleWebRoot(AsyncWebServerRequest* request) {
+int handleWebRoot(og3::NetRequest* request) {
   s_monitor.readSensors();
   s_html.clear();
   html::writeTableInto(&s_html, s_monitor.vg());
@@ -365,6 +366,7 @@ void handleWebRoot(AsyncWebServerRequest* request) {
   s_button_app_status.add_button(&s_html);
   s_button_restart.add_button(&s_html);
   sendWrappedHTML(request, s_app.board_cname(), kSoftware, s_html.c_str());
+  return ESP_OK;
 }
 
 }  // namespace og3
@@ -372,9 +374,10 @@ void handleWebRoot(AsyncWebServerRequest* request) {
 ////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
-  og3::s_app.web_server().on("/", og3::handleWebRoot);
-  og3::s_app.web_server().on("/config", [](AsyncWebServerRequest* request) {
+  og3::s_app.web_server_module().on("/", og3::handleWebRoot);
+  og3::s_app.web_server_module().on("/config", [](og3::NetRequest* request) {
     og3::s_monitor.handleConfigRequest(request);
+    return ESP_OK;
   });
   og3::s_app.setup();
 }
