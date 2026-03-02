@@ -1,6 +1,5 @@
 // Copyright (c) 2026 Chris Lee and contributors.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
-// details.
 
 #include <Arduino.h>
 #include <LittleFS.h>
@@ -245,12 +244,12 @@ class Monitor : public Module {
   }
   const VariableGroup& vg() const { return m_vg; }
 
-  int handleConfigRequest(og3::NetRequest* request) {
+  og3::NetHandlerStatus handleConfigRequest(og3::NetRequest* request, og3::NetResponse* response) {
     ::og3::read(*request, m_cvg);
     s_html.clear();
     html::writeFormTableInto(&s_html, m_cvg);
     s_html += HTML_BUTTON("/", "Back");
-    sendWrappedHTML(request, kSoftware, kSoftware, s_html.c_str());
+    sendWrappedHTML(request, response, kSoftware, kSoftware, s_html.c_str());
     s_app.config().write_config(m_cvg);
     return ESP_OK;
   }
@@ -354,7 +353,7 @@ WebButton s_button_mqtt_config = s_app.createMqttConfigButton();
 WebButton s_button_app_status = s_app.createAppStatusButton();
 WebButton s_button_restart = s_app.createRestartButton();
 
-int handleWebRoot(og3::NetRequest* request) {
+og3::NetHandlerStatus handleWebRoot(og3::NetRequest* request, og3::NetResponse* response) {
   s_monitor.readSensors();
   s_html.clear();
   html::writeTableInto(&s_html, s_monitor.vg());
@@ -365,7 +364,7 @@ int handleWebRoot(og3::NetRequest* request) {
   s_button_mqtt_config.add_button(&s_html);
   s_button_app_status.add_button(&s_html);
   s_button_restart.add_button(&s_html);
-  sendWrappedHTML(request, s_app.board_cname(), kSoftware, s_html.c_str());
+  sendWrappedHTML(request, response, s_app.board_cname(), kSoftware, s_html.c_str());
   return ESP_OK;
 }
 
@@ -375,10 +374,10 @@ int handleWebRoot(og3::NetRequest* request) {
 
 void setup() {
   og3::s_app.web_server_module().on("/", og3::handleWebRoot);
-  og3::s_app.web_server_module().on("/config", [](og3::NetRequest* request) {
-    og3::s_monitor.handleConfigRequest(request);
-    return ESP_OK;
-  });
+  og3::s_app.web_server_module().on("/config",
+                                    [](og3::NetRequest* request, og3::NetResponse* response) {
+                                      return og3::s_monitor.handleConfigRequest(request, response);
+                                    });
   og3::s_app.setup();
 }
 
