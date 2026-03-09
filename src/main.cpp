@@ -4,14 +4,6 @@
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <WiFiClientSecure.h>
-
-#include <algorithm>
-#include <cstring>
-
-#if HAVE_OLED
-#include "SSD1306Wire.h"
-#endif
-
 #include <og3/blink_led.h>
 #include <og3/constants.h>
 #include <og3/ha_app.h>
@@ -22,6 +14,9 @@
 #include <og3/units.h>
 #include <og3/variable.h>
 
+#include <algorithm>
+#include <cstring>
+
 #if HAVE_MOTION_LIGHT || HAVE_MOTION
 #include <og3/pir.h>
 #endif
@@ -31,7 +26,7 @@
 #include <og3/motion_detector.h>
 #endif
 
-#define VERSION "0.9.92"
+#define VERSION "0.9.93"
 
 namespace og3 {
 
