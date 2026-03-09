@@ -1,0 +1,32 @@
+[local]
+build_flags =
+;	'-D LOG_DEBUG'
+;	'-D LOG_UDP'
+;	'-D LOG_UDP_ADDRESS=${secrets.udpLogTarget}'
+
+upload_flags = 
+
+[livingroom]
+upload_protocol = espota
+upload_port = IP_ADDRESS_HERE
+have_motion_light = 1
+have_motion = 0
+have_leak = 0
+have_oled = 1
+board_v10 = 1
+
+[workshop]
+upload_protocol = esptool
+upload_port = /dev/ttyUSB0
+; upload_port = IP_ADDRESS
+have_motion_light = 1
+have_motion = 1
+have_leak = 0
+have_oled = 1
+board_v10 = 1
+
+[env:livingroom]
+extends = node32s, livingroom
+
+[env:workshop]
+extends = node32s, workshop

@@ -1,18 +1,9 @@
 // Copyright (c) 2026 Chris Lee and contributors.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
-// details.
 
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <WiFiClientSecure.h>
-
-#include <algorithm>
-#include <cstring>
-
-#if HAVE_OLED
-#include "SSD1306Wire.h"
-#endif
-
 #include <og3/blink_led.h>
 #include <og3/constants.h>
 #include <og3/ha_app.h>
@@ -23,6 +14,9 @@
 #include <og3/units.h>
 #include <og3/variable.h>
 
+#include <algorithm>
+#include <cstring>
+
 #if HAVE_MOTION_LIGHT || HAVE_MOTION
 #include <og3/pir.h>
 #endif
@@ -32,7 +26,7 @@
 #include <og3/motion_detector.h>
 #endif
 
-#define VERSION "0.9.92"
+#define VERSION "0.9.93"
 
 namespace og3 {
 
@@ -245,13 +239,14 @@ class Monitor : public Module {
   }
   const VariableGroup& vg() const { return m_vg; }
 
-  void handleConfigRequest(AsyncWebServerRequest* request) {
+  og3::NetHandlerStatus handleConfigRequest(og3::NetRequest* request, og3::NetResponse* response) {
     ::og3::read(*request, m_cvg);
     s_html.clear();
     html::writeFormTableInto(&s_html, m_cvg);
     s_html += HTML_BUTTON("/", "Back");
-    sendWrappedHTML(request, kSoftware, kSoftware, s_html.c_str());
+    sendWrappedHTML(request, response, kSoftware, kSoftware, s_html.c_str());
     s_app.config().write_config(m_cvg);
+    return ESP_OK;
   }
 
   void readSensors() {
@@ -353,7 +348,7 @@ WebButton s_button_mqtt_config = s_app.createMqttConfigButton();
 WebButton s_button_app_status = s_app.createAppStatusButton();
 WebButton s_button_restart = s_app.createRestartButton();
 
-void handleWebRoot(AsyncWebServerRequest* request) {
+og3::NetHandlerStatus handleWebRoot(og3::NetRequest* request, og3::NetResponse* response) {
   s_monitor.readSensors();
   s_html.clear();
   html::writeTableInto(&s_html, s_monitor.vg());
@@ -364,7 +359,8 @@ void handleWebRoot(AsyncWebServerRequest* request) {
   s_button_mqtt_config.add_button(&s_html);
   s_button_app_status.add_button(&s_html);
   s_button_restart.add_button(&s_html);
-  sendWrappedHTML(request, s_app.board_cname(), kSoftware, s_html.c_str());
+  sendWrappedHTML(request, response, s_app.board_cname(), kSoftware, s_html.c_str());
+  return ESP_OK;
 }
 
 }  // namespace og3
@@ -372,10 +368,11 @@ void handleWebRoot(AsyncWebServerRequest* request) {
 ////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
-  og3::s_app.web_server().on("/", og3::handleWebRoot);
-  og3::s_app.web_server().on("/config", [](AsyncWebServerRequest* request) {
-    og3::s_monitor.handleConfigRequest(request);
-  });
+  og3::s_app.web_server_module().on("/", og3::handleWebRoot);
+  og3::s_app.web_server_module().on("/config",
+                                    [](og3::NetRequest* request, og3::NetResponse* response) {
+                                      return og3::s_monitor.handleConfigRequest(request, response);
+                                    });
   og3::s_app.setup();
 }
 
