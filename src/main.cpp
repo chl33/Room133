@@ -13,6 +13,7 @@
 #include <og3/shtc3.h>
 #include <og3/units.h>
 #include <og3/variable.h>
+#include <og3/web_server.h>
 
 #include <algorithm>
 #include <cstring>
@@ -103,11 +104,12 @@ OledDisplayRing s_oled(&s_app.module_system(), kSoftware, kOledSwitchMsec, Oled:
 #endif
 
 #if HAVE_LEAK
-class LeakSensor {
+class LeakSensor : public Module {
  public:
   LeakSensor(const char* name, ModuleSystem* module_system_, VariableGroup& cfgvg,
              VariableGroup& vg)
-      : m_leak_sensor(
+      : Module(name, module_system_),
+        m_leak_sensor(
             MappedAnalogSensor::Options{
                 .name = name,
                 .pin = kLeakPin,
@@ -137,7 +139,16 @@ class LeakSensor {
                 .decimals = 1,
                 .size = KernelFilter::kDefaultNumSamples,
             },
-            module_system_, vg) {}
+            module_system_, vg) {
+    require(HADiscovery::kName, &m_ha_discovery);
+    add_init_fn([this]() {
+      if (m_ha_discovery) {
+        m_ha_discovery->addDiscoveryCallback([this](HADiscovery* had, JsonDocument* json) {
+          return had->addMeas(json, value(), ha::device_type::kSensor, nullptr);
+        });
+      }
+    });
+  }
 
   void read() {
     const float val = m_leak_sensor.read();  // TODO(chrishl): check is reasonable value
@@ -151,6 +162,7 @@ class LeakSensor {
   MappedAnalogSensor m_leak_sensor;
   String m_filtered_name;
   KernelFilter m_filter;
+  HADiscovery* m_ha_discovery = nullptr;
 };
 #endif
 
@@ -204,21 +216,20 @@ class Monitor : public Module {
         m_ylw_blink("ylw_blink", kYellowLed, app, 500, false),
 #endif
         m_shtc3(kTemperature, kHumidity, &app->module_system(), "temperature", m_vg) {
-    setDependencies(&m_dependencies);
+    require(MqttManager::kName, &m_mqtt_manager);
+    require(HADiscovery::kName, &m_ha_discovery);
     add_init_fn([this]() {
-      if (m_dependencies.ok()) {
+      if (m_ha_discovery) {
 #if HAVE_MOTION_LIGHT
-        m_dependencies.ha_discovery()->addDiscoveryCallback(
-            [this](HADiscovery* had, JsonDocument* json) {
-              return had->addMeas(json, m_light_sensor.mapped_value(), ha::device_type::kSensor,
-                                  nullptr);
-            });
+        m_ha_discovery->addDiscoveryCallback([this](HADiscovery* had, JsonDocument* json) {
+          return had->addMeas(json, m_light_sensor.mapped_value(), ha::device_type::kSensor,
+                              nullptr);
+        });
 #endif
 #if HAVE_LEAK
-        m_dependencies.ha_discovery()->addDiscoveryCallback(
-            [this](HADiscovery* had, JsonDocument* json) {
-              return had->addMeas(json, m_leak_sensor.value(), ha::device_type::kSensor, nullptr);
-            });
+        m_ha_discovery->addDiscoveryCallback([this](HADiscovery* had, JsonDocument* json) {
+          return had->addMeas(json, m_leak_sensor.value(), ha::device_type::kSensor, nullptr);
+        });
 #endif
       }
 #if HAVE_MOTION_LIGHT
@@ -246,7 +257,7 @@ class Monitor : public Module {
     s_html += HTML_BUTTON("/", "Back");
     sendWrappedHTML(request, response, kSoftware, kSoftware, s_html.c_str());
     s_app.config().write_config(m_cvg);
-    return ESP_OK;
+    NET_REPLY(request, ESP_OK);
   }
 
   void readSensors() {
@@ -313,7 +324,8 @@ class Monitor : public Module {
   }
 
   HAApp* const m_app;
-  HADependencies m_dependencies;
+  MqttManager* m_mqtt_manager = nullptr;
+  HADiscovery* m_ha_discovery = nullptr;
   // Send configuration every 5 minutes.
   PeriodicTaskScheduler m_mqtt_scheduler;
   VariableGroup m_cvg;
@@ -348,7 +360,7 @@ WebButton s_button_mqtt_config = s_app.createMqttConfigButton();
 WebButton s_button_app_status = s_app.createAppStatusButton();
 WebButton s_button_restart = s_app.createRestartButton();
 
-og3::NetHandlerStatus handleWebRoot(og3::NetRequest* request, og3::NetResponse* response) {
+NetHandlerStatus handleWebRoot(NetRequest* request, NetResponse* response) {
   s_monitor.readSensors();
   s_html.clear();
   html::writeTableInto(&s_html, s_monitor.vg());
@@ -360,7 +372,7 @@ og3::NetHandlerStatus handleWebRoot(og3::NetRequest* request, og3::NetResponse* 
   s_button_app_status.add_button(&s_html);
   s_button_restart.add_button(&s_html);
   sendWrappedHTML(request, response, s_app.board_cname(), kSoftware, s_html.c_str());
-  return ESP_OK;
+  NET_REPLY(request, ESP_OK);
 }
 
 }  // namespace og3
@@ -368,8 +380,13 @@ og3::NetHandlerStatus handleWebRoot(og3::NetRequest* request, og3::NetResponse* 
 ////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
-  og3::s_app.web_server_module().on("/", og3::handleWebRoot);
-  og3::s_app.web_server_module().on("/config",
+  og3::s_app.web_server_module().on("/", HTTP_GET, og3::handleWebRoot);
+  og3::s_app.web_server_module().on("/", HTTP_POST, og3::handleWebRoot);
+  og3::s_app.web_server_module().on("/config", HTTP_GET,
+                                    [](og3::NetRequest* request, og3::NetResponse* response) {
+                                      return og3::s_monitor.handleConfigRequest(request, response);
+                                    });
+  og3::s_app.web_server_module().on("/config", HTTP_POST,
                                     [](og3::NetRequest* request, og3::NetResponse* response) {
                                       return og3::s_monitor.handleConfigRequest(request, response);
                                     });
