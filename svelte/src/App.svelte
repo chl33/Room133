@@ -155,8 +155,8 @@
             <div class="card">
               <h3>Light & Motion</h3>
               <div class="stat"><Sun /> {$status.light.toFixed(1)}% Light</div>
-              <div class="stat" class:active={$status.motion}>
-                <Activity /> {$status.motion ? 'Motion Detected' : 'Clear'}
+              <div class="stat" class:active={$status.motion === 'ON'}>
+                <Activity /> {$status.motion === 'ON' ? 'Motion Detected' : 'Clear'}
               </div>
             </div>
           {/if}
@@ -164,8 +164,8 @@
           {#if $status.features.haveMotion}
             <div class="card">
               <h3>Motion 2</h3>
-              <div class="stat" class:active={$status.motion2}>
-                <Activity /> {$status.motion2 ? 'Motion Detected' : 'Clear'}
+              <div class="stat" class:active={$status.motion2 === 'ON'}>
+                <Activity /> {$status.motion2 === 'ON' ? 'Motion Detected' : 'Clear'}
               </div>
             </div>
           {/if}
@@ -202,7 +202,7 @@
       {:else if currentPage === 'config'}
         <div class="card form">
           <h3>Parameters</h3>
-          {#each Object.keys($config) as key}
+          {#each Object.keys($config).filter(k => !k.endsWith('OutMin') && !k.endsWith('OutMax')) as key}
             <label>{key} <input bind:value={$config[key]} /></label>
           {/each}
           <button on:click={() => sendConfig('/config', $config)}>Save</button>
