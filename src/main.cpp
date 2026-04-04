@@ -13,9 +13,12 @@
 #include <og3/shtc3.h>
 #include <og3/units.h>
 #include <og3/variable.h>
+#include <og3/web_server.h>
 
 #include <algorithm>
 #include <cstring>
+
+#include "svelteesp32async.h"
 
 #if HAVE_MOTION_LIGHT || HAVE_MOTION
 #include <og3/pir.h>
@@ -26,7 +29,7 @@
 #include <og3/motion_detector.h>
 #endif
 
-#define VERSION "0.9.93"
+#define VERSION "1.0.0"
 
 namespace og3 {
 
@@ -103,11 +106,12 @@ OledDisplayRing s_oled(&s_app.module_system(), kSoftware, kOledSwitchMsec, Oled:
 #endif
 
 #if HAVE_LEAK
-class LeakSensor {
+class LeakSensor : public Module {
  public:
   LeakSensor(const char* name, ModuleSystem* module_system_, VariableGroup& cfgvg,
              VariableGroup& vg)
-      : m_leak_sensor(
+      : Module(name, module_system_),
+        m_leak_sensor(
             MappedAnalogSensor::Options{
                 .name = name,
                 .pin = kLeakPin,
@@ -137,7 +141,16 @@ class LeakSensor {
                 .decimals = 1,
                 .size = KernelFilter::kDefaultNumSamples,
             },
-            module_system_, vg) {}
+            module_system_, vg) {
+    require(HADiscovery::kName, &m_ha_discovery);
+    add_init_fn([this]() {
+      if (m_ha_discovery) {
+        m_ha_discovery->addDiscoveryCallback([this](HADiscovery* had, JsonDocument* json) {
+          return had->addMeas(json, value(), ha::device_type::kSensor, nullptr);
+        });
+      }
+    });
+  }
 
   void read() {
     const float val = m_leak_sensor.read();  // TODO(chrishl): check is reasonable value
@@ -151,6 +164,7 @@ class LeakSensor {
   MappedAnalogSensor m_leak_sensor;
   String m_filtered_name;
   KernelFilter m_filter;
+  HADiscovery* m_ha_discovery = nullptr;
 };
 #endif
 
@@ -190,10 +204,12 @@ class Monitor : public Module {
         m_leak_sensor(kLeakSensor, &app->module_system(), m_cvg, m_vg),
 #endif
 #if HAVE_MOTION_LIGHT
-        m_pir1(kPirModule, kMotion, &app->module_system(), kPirPin1, kMotion, m_vg, true, true),
+        m_pir1(kPirModule, kMotion, &app->module_system(), kPirPin1, kMotion, m_vg, true, true,
+               INPUT_PULLDOWN),
 #endif
 #if HAVE_MOTION
-        m_pir2(kPirModule2, kMotion2, &app->module_system(), kPirPin2, kMotion2, m_vg, true, true),
+        m_pir2(kPirModule2, kMotion2, &app->module_system(), kPirPin2, kMotion2, m_vg, true, true,
+               INPUT_PULLDOWN),
 #endif
 #if HAVE_OLED
         m_wifi_oled(&app->tasks()),
@@ -204,21 +220,20 @@ class Monitor : public Module {
         m_ylw_blink("ylw_blink", kYellowLed, app, 500, false),
 #endif
         m_shtc3(kTemperature, kHumidity, &app->module_system(), "temperature", m_vg) {
-    setDependencies(&m_dependencies);
+    require(MqttManager::kName, &m_mqtt_manager);
+    require(HADiscovery::kName, &m_ha_discovery);
     add_init_fn([this]() {
-      if (m_dependencies.ok()) {
+      if (m_ha_discovery) {
 #if HAVE_MOTION_LIGHT
-        m_dependencies.ha_discovery()->addDiscoveryCallback(
-            [this](HADiscovery* had, JsonDocument* json) {
-              return had->addMeas(json, m_light_sensor.mapped_value(), ha::device_type::kSensor,
-                                  nullptr);
-            });
+        m_ha_discovery->addDiscoveryCallback([this](HADiscovery* had, JsonDocument* json) {
+          return had->addMeas(json, m_light_sensor.mapped_value(), ha::device_type::kSensor,
+                              nullptr);
+        });
 #endif
 #if HAVE_LEAK
-        m_dependencies.ha_discovery()->addDiscoveryCallback(
-            [this](HADiscovery* had, JsonDocument* json) {
-              return had->addMeas(json, m_leak_sensor.value(), ha::device_type::kSensor, nullptr);
-            });
+        m_ha_discovery->addDiscoveryCallback([this](HADiscovery* had, JsonDocument* json) {
+          return had->addMeas(json, m_leak_sensor.value(), ha::device_type::kSensor, nullptr);
+        });
 #endif
       }
 #if HAVE_MOTION_LIGHT
@@ -237,7 +252,8 @@ class Monitor : public Module {
       m_app->config().read_config(m_vg);
     });
   }
-  const VariableGroup& vg() const { return m_vg; }
+  VariableGroup& vg() { return m_vg; }
+  VariableGroup& cvg() { return m_cvg; }
 
   og3::NetHandlerStatus handleConfigRequest(og3::NetRequest* request, og3::NetResponse* response) {
     ::og3::read(*request, m_cvg);
@@ -246,7 +262,7 @@ class Monitor : public Module {
     s_html += HTML_BUTTON("/", "Back");
     sendWrappedHTML(request, response, kSoftware, kSoftware, s_html.c_str());
     s_app.config().write_config(m_cvg);
-    return ESP_OK;
+    NET_REPLY(request, ESP_OK);
   }
 
   void readSensors() {
@@ -313,7 +329,8 @@ class Monitor : public Module {
   }
 
   HAApp* const m_app;
-  HADependencies m_dependencies;
+  MqttManager* m_mqtt_manager = nullptr;
+  HADiscovery* m_ha_discovery = nullptr;
   // Send configuration every 5 minutes.
   PeriodicTaskScheduler m_mqtt_scheduler;
   VariableGroup m_cvg;
@@ -348,19 +365,136 @@ WebButton s_button_mqtt_config = s_app.createMqttConfigButton();
 WebButton s_button_app_status = s_app.createAppStatusButton();
 WebButton s_button_restart = s_app.createRestartButton();
 
-og3::NetHandlerStatus handleWebRoot(og3::NetRequest* request, og3::NetResponse* response) {
+static String s_body;
+
+NetHandlerStatus handleWebRoot(NetRequest* request, NetResponse* response) {
   s_monitor.readSensors();
   s_html.clear();
   html::writeTableInto(&s_html, s_monitor.vg());
   html::writeTableInto(&s_html, s_app.wifi_manager().variables());
   html::writeTableInto(&s_html, s_app.mqtt_manager().variables());
-  s_html += HTML_BUTTON("/config", "Config");
+  s_html += HTML_BUTTON("/old_config", "Config");
   s_button_wifi_config.add_button(&s_html);
   s_button_mqtt_config.add_button(&s_html);
   s_button_app_status.add_button(&s_html);
   s_button_restart.add_button(&s_html);
   sendWrappedHTML(request, response, s_app.board_cname(), kSoftware, s_html.c_str());
-  return ESP_OK;
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus apiGetWifi(NetRequest* request, NetResponse* response) {
+  JsonDocument jsondoc;
+  JsonObject json = jsondoc.to<JsonObject>();
+  s_app.wifi_manager().variables().toJson(json, VariableBase::kConfig);
+  s_body.clear();
+  serializeJson(jsondoc, s_body);
+  response->send(200, "application/json", s_body.c_str());
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus putWifiConfig(NetRequest* request, NetResponse* response, JsonVariant& jsonIn) {
+  if (!jsonIn.is<JsonObject>()) {
+    response->send(500, "text/plain", "not a json object");
+    NET_REPLY(request, ESP_FAIL);
+  }
+  JsonObject obj = jsonIn.as<JsonObject>();
+  s_app.wifi_manager().variables().updateFromJson(obj);
+  s_app.config().write_config(s_app.wifi_manager().variables());
+  response->send(200, "text/plain", "ok");
+  s_app.tasks().runIn(1000, []() { ESP.restart(); });
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus apiGetMqtt(NetRequest* request, NetResponse* response) {
+  JsonDocument jsondoc;
+  JsonObject json = jsondoc.to<JsonObject>();
+  s_app.mqtt_manager().variables().toJson(json, VariableBase::kConfig);
+  s_body.clear();
+  serializeJson(jsondoc, s_body);
+  response->send(200, "application/json", s_body.c_str());
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus putMqttConfig(NetRequest* request, NetResponse* response, JsonVariant& jsonIn) {
+  if (!jsonIn.is<JsonObject>()) {
+    response->send(500, "text/plain", "not a json object");
+    NET_REPLY(request, ESP_FAIL);
+  }
+  JsonObject obj = jsonIn.as<JsonObject>();
+  s_app.mqtt_manager().variables().updateFromJson(obj);
+  s_app.config().write_config(s_app.mqtt_manager().variables());
+  if (s_app.mqtt_manager().isEnabled() && !s_app.mqtt_manager().isConnected()) {
+    s_app.mqtt_manager().connect();
+  } else if (!s_app.mqtt_manager().isEnabled() && s_app.mqtt_manager().isConnected()) {
+    s_app.mqtt_manager().disconnect();
+  }
+  response->send(200, "text/plain", "ok");
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus apiGetStatus(NetRequest* request, NetResponse* response) {
+  s_monitor.readSensors();
+  JsonDocument jsondoc;
+  JsonObject json = jsondoc.to<JsonObject>();
+  s_monitor.vg().toJson(json, 0);
+  json["mqttConnected"] = s_app.mqtt_manager().isConnected();
+  json["software"] = VERSION;
+  json["hardware"] = "Room133";
+  json["board"] = s_app.board_cname();
+
+  JsonObject features = json["features"].to<JsonObject>();
+#if HAVE_MOTION_LIGHT
+  features["haveMotionLight"] = true;
+#else
+  features["haveMotionLight"] = false;
+#endif
+#if HAVE_MOTION
+  features["haveMotion"] = true;
+#else
+  features["haveMotion"] = false;
+#endif
+#if HAVE_LEAK
+  features["haveLeak"] = true;
+#else
+  features["haveLeak"] = false;
+#endif
+#if HAVE_OLED
+  features["haveOled"] = true;
+#else
+  features["haveOled"] = false;
+#endif
+#if BOARD_V10
+  features["boardV10"] = true;
+#else
+  features["boardV10"] = false;
+#endif
+
+  s_body.clear();
+  serializeJson(jsondoc, s_body);
+  response->send(200, "application/json", s_body.c_str());
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus apiGetConfig(NetRequest* request, NetResponse* response) {
+  JsonDocument jsondoc;
+  JsonObject json = jsondoc.to<JsonObject>();
+  s_monitor.cvg().toJson(json, VariableBase::kConfig);
+  s_body.clear();
+  serializeJson(jsondoc, s_body);
+  response->send(200, "application/json", s_body.c_str());
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus putApiConfig(NetRequest* request, NetResponse* response, JsonVariant& jsonIn) {
+  if (!jsonIn.is<JsonObject>()) {
+    response->send(500, "text/plain", "not a json object");
+    NET_REPLY(request, ESP_FAIL);
+  }
+  JsonObject obj = jsonIn.as<JsonObject>();
+  s_monitor.cvg().updateFromJson(obj);
+  s_app.config().write_config(s_monitor.cvg());
+  response->send(200, "text/plain", "ok");
+  NET_REPLY(request, ESP_OK);
 }
 
 }  // namespace og3
@@ -368,11 +502,34 @@ og3::NetHandlerStatus handleWebRoot(og3::NetRequest* request, og3::NetResponse* 
 ////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
-  og3::s_app.web_server_module().on("/", og3::handleWebRoot);
-  og3::s_app.web_server_module().on("/config",
+  og3::s_app.web_server_module().on("/old", HTTP_GET, og3::handleWebRoot);
+  og3::s_app.web_server_module().on("/old", HTTP_POST, og3::handleWebRoot);
+  og3::s_app.web_server_module().on("/old_config", HTTP_GET,
                                     [](og3::NetRequest* request, og3::NetResponse* response) {
                                       return og3::s_monitor.handleConfigRequest(request, response);
                                     });
+  og3::s_app.web_server_module().on("/old_config", HTTP_POST,
+                                    [](og3::NetRequest* request, og3::NetResponse* response) {
+                                      return og3::s_monitor.handleConfigRequest(request, response);
+                                    });
+
+  initSvelteStaticFiles(&og3::s_app.web_server_module().native_server());
+  og3::s_app.web_server_module().on("/api/wifi", HTTP_GET, og3::apiGetWifi);
+  og3::s_app.web_server_module().on("/api/mqtt", HTTP_GET, og3::apiGetMqtt);
+  og3::s_app.web_server_module().on("/api/status", HTTP_GET, og3::apiGetStatus);
+  og3::s_app.web_server_module().on("/api/config", HTTP_GET, og3::apiGetConfig);
+
+  og3::s_app.web_server_module().onJson("/api/wifi", HTTP_PUT, og3::putWifiConfig);
+  og3::s_app.web_server_module().onJson("/api/mqtt", HTTP_PUT, og3::putMqttConfig);
+  og3::s_app.web_server_module().onJson("/api/config", HTTP_PUT, og3::putApiConfig);
+
+  og3::s_app.web_server_module().on("/api/restart", HTTP_POST,
+                                    [](og3::NetRequest* request, og3::NetResponse* response) {
+                                      response->send(200, "text/plain", "restarting");
+                                      og3::s_app.tasks().runIn(1000, []() { ESP.restart(); });
+                                      NET_REPLY(request, ESP_OK);
+                                    });
+
   og3::s_app.setup();
 }
 

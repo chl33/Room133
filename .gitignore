@@ -8,3 +8,4 @@
 /KiCAD/Room133-backups/
 *.old
 *.3mf
+/src/svelteesp32async.h
