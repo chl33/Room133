@@ -20,6 +20,7 @@
     mqttConnected: false,
     software: '',
     hardware: '',
+    board: '',
     features: {
       haveMotionLight: false,
       haveMotion: false,
@@ -88,7 +89,12 @@
 
 <div class="app">
   <nav class="sidebar">
-    <div class="brand">Room133</div>
+    <div class="brand">
+      Room133
+      {#if $status.board}
+        <div class="hostname">{$status.board}</div>
+      {/if}
+    </div>
 
     <div class="connection-status">
       <div class="status-item" class:online={$isOnline}>
@@ -221,6 +227,7 @@
   }
 
   .brand { font-size: 1.5rem; font-weight: bold; text-align: center; margin-bottom: 0.5rem; }
+  .hostname { font-size: 0.875rem; color: #10b981; font-weight: normal; margin-top: 0.25rem; }
 
   .connection-status {
     background: #111827;

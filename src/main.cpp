@@ -204,10 +204,12 @@ class Monitor : public Module {
         m_leak_sensor(kLeakSensor, &app->module_system(), m_cvg, m_vg),
 #endif
 #if HAVE_MOTION_LIGHT
-        m_pir1(kPirModule, kMotion, &app->module_system(), kPirPin1, kMotion, m_vg, true, true),
+        m_pir1(kPirModule, kMotion, &app->module_system(), kPirPin1, kMotion, m_vg, true, true,
+               INPUT_PULLDOWN),
 #endif
 #if HAVE_MOTION
-        m_pir2(kPirModule2, kMotion2, &app->module_system(), kPirPin2, kMotion2, m_vg, true, true),
+        m_pir2(kPirModule2, kMotion2, &app->module_system(), kPirPin2, kMotion2, m_vg, true, true,
+               INPUT_PULLDOWN),
 #endif
 #if HAVE_OLED
         m_wifi_oled(&app->tasks()),
@@ -438,6 +440,7 @@ NetHandlerStatus apiGetStatus(NetRequest* request, NetResponse* response) {
   json["mqttConnected"] = s_app.mqtt_manager().isConnected();
   json["software"] = VERSION;
   json["hardware"] = "Room133";
+  json["board"] = s_app.board_cname();
 
   JsonObject features = json["features"].to<JsonObject>();
 #if HAVE_MOTION_LIGHT
