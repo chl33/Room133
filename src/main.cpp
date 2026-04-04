@@ -29,7 +29,7 @@
 #include <og3/motion_detector.h>
 #endif
 
-#define VERSION "0.9.93"
+#define VERSION "0.9.95"
 
 namespace og3 {
 
@@ -399,6 +399,7 @@ NetHandlerStatus putWifiConfig(NetRequest* request, NetResponse* response, JsonV
   s_app.wifi_manager().variables().updateFromJson(obj);
   s_app.config().write_config(s_app.wifi_manager().variables());
   response->send(200, "text/plain", "ok");
+  s_app.tasks().runIn(1000, []() { ESP.restart(); });
   NET_REPLY(request, ESP_OK);
 }
 
