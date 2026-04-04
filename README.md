@@ -13,6 +13,9 @@ Room133 is an ESP32-based family of devices which helps with various room-monito
 
 It is based on the [og3](https://github.com/chl33/og3) C++ software framework.
 
+![Web interface](images/web-ui.png)
+
+
 This repository includes software for the device, KiCAD files for the circuit board, and OpenSCAD files for creating the project boxes for the different devices.
 
 Please see the [write-up](https://selectiveappeal.org/posts/room133/) on the project in my blog.  I also [wrote about](https://selectiveappeal.org/posts/room133-box/) the EBox design included in this repository.
