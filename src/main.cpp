@@ -18,6 +18,8 @@
 #include <algorithm>
 #include <cstring>
 
+#include "svelteesp32async.h"
+
 #if HAVE_MOTION_LIGHT || HAVE_MOTION
 #include <og3/pir.h>
 #endif
@@ -248,7 +250,8 @@ class Monitor : public Module {
       m_app->config().read_config(m_vg);
     });
   }
-  const VariableGroup& vg() const { return m_vg; }
+  VariableGroup& vg() { return m_vg; }
+  VariableGroup& cvg() { return m_cvg; }
 
   og3::NetHandlerStatus handleConfigRequest(og3::NetRequest* request, og3::NetResponse* response) {
     ::og3::read(*request, m_cvg);
@@ -360,13 +363,15 @@ WebButton s_button_mqtt_config = s_app.createMqttConfigButton();
 WebButton s_button_app_status = s_app.createAppStatusButton();
 WebButton s_button_restart = s_app.createRestartButton();
 
+static String s_body;
+
 NetHandlerStatus handleWebRoot(NetRequest* request, NetResponse* response) {
   s_monitor.readSensors();
   s_html.clear();
   html::writeTableInto(&s_html, s_monitor.vg());
   html::writeTableInto(&s_html, s_app.wifi_manager().variables());
   html::writeTableInto(&s_html, s_app.mqtt_manager().variables());
-  s_html += HTML_BUTTON("/config", "Config");
+  s_html += HTML_BUTTON("/old_config", "Config");
   s_button_wifi_config.add_button(&s_html);
   s_button_mqtt_config.add_button(&s_html);
   s_button_app_status.add_button(&s_html);
@@ -375,21 +380,152 @@ NetHandlerStatus handleWebRoot(NetRequest* request, NetResponse* response) {
   NET_REPLY(request, ESP_OK);
 }
 
+NetHandlerStatus apiGetWifi(NetRequest* request, NetResponse* response) {
+  JsonDocument jsondoc;
+  JsonObject json = jsondoc.to<JsonObject>();
+  s_app.wifi_manager().variables().toJson(json, VariableBase::kConfig);
+  s_body.clear();
+  serializeJson(jsondoc, s_body);
+  response->send(200, "application/json", s_body.c_str());
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus putWifiConfig(NetRequest* request, NetResponse* response, JsonVariant& jsonIn) {
+  if (!jsonIn.is<JsonObject>()) {
+    response->send(500, "text/plain", "not a json object");
+    NET_REPLY(request, ESP_FAIL);
+  }
+  JsonObject obj = jsonIn.as<JsonObject>();
+  s_app.wifi_manager().variables().updateFromJson(obj);
+  s_app.config().write_config(s_app.wifi_manager().variables());
+  response->send(200, "text/plain", "ok");
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus apiGetMqtt(NetRequest* request, NetResponse* response) {
+  JsonDocument jsondoc;
+  JsonObject json = jsondoc.to<JsonObject>();
+  s_app.mqtt_manager().variables().toJson(json, VariableBase::kConfig);
+  s_body.clear();
+  serializeJson(jsondoc, s_body);
+  response->send(200, "application/json", s_body.c_str());
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus putMqttConfig(NetRequest* request, NetResponse* response, JsonVariant& jsonIn) {
+  if (!jsonIn.is<JsonObject>()) {
+    response->send(500, "text/plain", "not a json object");
+    NET_REPLY(request, ESP_FAIL);
+  }
+  JsonObject obj = jsonIn.as<JsonObject>();
+  s_app.mqtt_manager().variables().updateFromJson(obj);
+  s_app.config().write_config(s_app.mqtt_manager().variables());
+  if (s_app.mqtt_manager().isEnabled() && !s_app.mqtt_manager().isConnected()) {
+    s_app.mqtt_manager().connect();
+  } else if (!s_app.mqtt_manager().isEnabled() && s_app.mqtt_manager().isConnected()) {
+    s_app.mqtt_manager().disconnect();
+  }
+  response->send(200, "text/plain", "ok");
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus apiGetStatus(NetRequest* request, NetResponse* response) {
+  s_monitor.readSensors();
+  JsonDocument jsondoc;
+  JsonObject json = jsondoc.to<JsonObject>();
+  s_monitor.vg().toJson(json, 0);
+  json["mqttConnected"] = s_app.mqtt_manager().isConnected();
+  json["software"] = VERSION;
+  json["hardware"] = "Room133";
+
+  JsonObject features = json["features"].to<JsonObject>();
+#if HAVE_MOTION_LIGHT
+  features["haveMotionLight"] = true;
+#else
+  features["haveMotionLight"] = false;
+#endif
+#if HAVE_MOTION
+  features["haveMotion"] = true;
+#else
+  features["haveMotion"] = false;
+#endif
+#if HAVE_LEAK
+  features["haveLeak"] = true;
+#else
+  features["haveLeak"] = false;
+#endif
+#if HAVE_OLED
+  features["haveOled"] = true;
+#else
+  features["haveOled"] = false;
+#endif
+#if BOARD_V10
+  features["boardV10"] = true;
+#else
+  features["boardV10"] = false;
+#endif
+
+  s_body.clear();
+  serializeJson(jsondoc, s_body);
+  response->send(200, "application/json", s_body.c_str());
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus apiGetConfig(NetRequest* request, NetResponse* response) {
+  JsonDocument jsondoc;
+  JsonObject json = jsondoc.to<JsonObject>();
+  s_monitor.cvg().toJson(json, VariableBase::kConfig);
+  s_body.clear();
+  serializeJson(jsondoc, s_body);
+  response->send(200, "application/json", s_body.c_str());
+  NET_REPLY(request, ESP_OK);
+}
+
+NetHandlerStatus putApiConfig(NetRequest* request, NetResponse* response, JsonVariant& jsonIn) {
+  if (!jsonIn.is<JsonObject>()) {
+    response->send(500, "text/plain", "not a json object");
+    NET_REPLY(request, ESP_FAIL);
+  }
+  JsonObject obj = jsonIn.as<JsonObject>();
+  s_monitor.cvg().updateFromJson(obj);
+  s_app.config().write_config(s_monitor.cvg());
+  response->send(200, "text/plain", "ok");
+  NET_REPLY(request, ESP_OK);
+}
+
 }  // namespace og3
 
 ////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
-  og3::s_app.web_server_module().on("/", HTTP_GET, og3::handleWebRoot);
-  og3::s_app.web_server_module().on("/", HTTP_POST, og3::handleWebRoot);
-  og3::s_app.web_server_module().on("/config", HTTP_GET,
+  og3::s_app.web_server_module().on("/old", HTTP_GET, og3::handleWebRoot);
+  og3::s_app.web_server_module().on("/old", HTTP_POST, og3::handleWebRoot);
+  og3::s_app.web_server_module().on("/old_config", HTTP_GET,
                                     [](og3::NetRequest* request, og3::NetResponse* response) {
                                       return og3::s_monitor.handleConfigRequest(request, response);
                                     });
-  og3::s_app.web_server_module().on("/config", HTTP_POST,
+  og3::s_app.web_server_module().on("/old_config", HTTP_POST,
                                     [](og3::NetRequest* request, og3::NetResponse* response) {
                                       return og3::s_monitor.handleConfigRequest(request, response);
                                     });
+
+  initSvelteStaticFiles(&og3::s_app.web_server_module().native_server());
+  og3::s_app.web_server_module().on("/api/wifi", HTTP_GET, og3::apiGetWifi);
+  og3::s_app.web_server_module().on("/api/mqtt", HTTP_GET, og3::apiGetMqtt);
+  og3::s_app.web_server_module().on("/api/status", HTTP_GET, og3::apiGetStatus);
+  og3::s_app.web_server_module().on("/api/config", HTTP_GET, og3::apiGetConfig);
+
+  og3::s_app.web_server_module().onJson("/api/wifi", HTTP_PUT, og3::putWifiConfig);
+  og3::s_app.web_server_module().onJson("/api/mqtt", HTTP_PUT, og3::putMqttConfig);
+  og3::s_app.web_server_module().onJson("/api/config", HTTP_PUT, og3::putApiConfig);
+
+  og3::s_app.web_server_module().on("/api/restart", HTTP_POST,
+                                    [](og3::NetRequest* request, og3::NetResponse* response) {
+                                      response->send(200, "text/plain", "restarting");
+                                      og3::s_app.tasks().runIn(1000, []() { ESP.restart(); });
+                                      NET_REPLY(request, ESP_OK);
+                                    });
+
   og3::s_app.setup();
 }
 
